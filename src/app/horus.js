@@ -2,7 +2,7 @@
    Foco: clientes, produtos e comissões. Receita escritório = valor × % do produto; parte do assessor = receita × repasse. */
 (function(){
 const W = window;
-const ACT = {}, CH = {};
+const ACT = W.ACT = W.ACT || {}, CH = W.CHANGE = W.CHANGE || {};
 const ymAddG = (ym, n) => { const [y, m] = ym.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
 
 /* ---------- Marca ---------- */
@@ -64,10 +64,10 @@ function seed() {
 }
 W.horusSeed = seed;
 let ST = null;
-const normalize = (st) => { st = st || {}; ['clientes', 'produtos', 'lancs', 'eventos'].forEach(k => { if (!Array.isArray(st[k])) st[k] = []; }); if (!st.receb || typeof st.receb !== 'object') st.receb = {}; if (!st.cfg) st.cfg = {}; st.clientes.forEach(c => { if (!c.contatos) c.contatos = []; }); return st; };
-const persist = () => { if (W.Store && ST) W.Store.save(ST); };
+const normalize = (st) => { st = st || {}; ['clientes', 'produtos', 'lancs', 'eventos', 'docs', 'imgLib'].forEach(k => { if (!Array.isArray(st[k])) st[k] = []; }); if (!st.receb || typeof st.receb !== 'object') st.receb = {}; if (!st.assets || typeof st.assets !== 'object') st.assets = {}; if (!st.cfg) st.cfg = {}; st.clientes.forEach(c => { if (!c.contatos) c.contatos = []; }); return st; };
+const persist = W.persist = () => { if (W.Store && ST) W.Store.save(ST); };
 W.setSync = (txt, kind) => { const si = $('#syncInfo'); if (si) si.innerHTML = '<span class="live-dot"' + (kind === 'off' ? ' style="background:var(--muted);box-shadow:none"' : kind === 'warn' ? ' style="background:var(--warn);box-shadow:none"' : '') + '></span>' + esc(txt); };
-W.UI = { tab: 'inicio', as: 'todos', cMes: ymAddG(iso(TODAY).slice(0, 7), -1), pj: null, q: '', lMes: iso(TODAY).slice(0, 7), lCat: 'Todas', rPer: '12m', cPerfil: 'Todos', drawer: null };
+W.UI = { des: { sub: 'home' }, tab: 'inicio', as: 'todos', cMes: ymAddG(iso(TODAY).slice(0, 7), -1), pj: null, q: '', lMes: iso(TODAY).slice(0, 7), lCat: 'Todas', rPer: '12m', cPerfil: 'Todos', drawer: null };
 let ME = 'a1';
 const me = () => ST.assessores.find(a => a.id === ME) || ST.assessores[0] || { id: ME, nome: 'Você', ini: '?', repasse: 35, meta: 0, role: 'admin', email: '' };
 const isAdmin = () => me().role === 'admin';
@@ -128,8 +128,18 @@ const catTag = (c) => '<span class="ncat" style="--c:' + (CAT_C[c] || '#8FB0FF')
 const tipoTag = (t) => '<span class="tag ' + (t === 'recorrente' ? 't-fin' : 't-design') + '">' + (t === 'recorrente' ? 'Recorrente' : 'Pontual') + '</span>';
 const avA = (id) => '<span class="av" title="' + esc(assOf(id).nome) + '">' + esc(assOf(id).ini) + '</span>';
 
+/* ---------- Dados para as apresentações (só dados do cliente; nunca comissão) ---------- */
+W.HorusData = {
+  clientes: () => visClientes().slice().sort((a, b) => a.nome.localeCompare(b.nome)),
+  cliente: (id) => cliOf(id),
+  assessor: () => me(),
+  carteira: (cid) => ST.lancs.filter(l => l.cli === cid && prodOf(l.prod).custodia && ativo(l) && (!l.venc || l.venc >= iso(TODAY))).map(l => { const p = prodOf(l.prod); return { nome: p.nome, cat: p.cat, valor: l.valor, data: l.data, venc: l.venc || '' }; }),
+  evolucao: (cid, n) => { const L = ST.lancs.filter(l => l.cli === cid && prodOf(l.prod).custodia); return lastN(n).map(ym => { const e = ymEnd(ym), s = ym + '-01', mi = +ym.slice(5) - 1; return { l: MESES[mi].charAt(0).toUpperCase() + MESES[mi].slice(1), v: L.filter(l => l.data <= e && (!l.fim || l.fim > e) && (!l.venc || l.venc >= s)).reduce((t, l) => t + l.valor, 0) }; }); }
+};
+ACT.cliDeck = (b) => { const id = b.dataset.id; closeDrawer(); go('apresentacoes'); if (W.Studio) W.Studio.pick(id); };
+
 /* ---------- Componentes ---------- */
-const AT = { inicio: 'home', clientes: 'user', lancamentos: 'money', conferencia: 'check', agenda: 'calendar', produtos: 'coins', projecao: 'trend', relatorios: 'chart', assessores: 'star' };
+const AT = { inicio: 'home', clientes: 'user', lancamentos: 'money', conferencia: 'check', agenda: 'calendar', apresentacoes: 'presenter', produtos: 'coins', projecao: 'trend', relatorios: 'chart', assessores: 'star' };
 const ph = (tab, eyebrow, title, meta, actions) => '<div class="ph"><div class="ph-l"><div class="ph-ico">' + icon(AT[tab]) + '</div><div><div class="eyebrow">' + esc(eyebrow) + '</div><h1>' + esc(title) + '</h1>' + (meta ? '<div class="ph-meta">' + meta + '</div>' : '') + '</div></div><div class="ph-r">' + (actions || '') + '</div></div>';
 const cardW = (title, sub, body, opts) => { opts = opts || {}; return '<section class="card"><div class="card-h"><div><h3>' + title + '</h3>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>' + (opts.tools || '') + '</div><div class="card-b"' + (opts.flush ? ' style="padding:0"' : '') + '>' + body + '</div></section>'; };
 const kpi = (cls, label, value, sub, extra) => '<div class="card kpi hkp ' + (cls || '') + '"><div class="kpi-l"><span>' + label + '</span></div><div class="kpi-v">' + value + '</div>' + (extra || '') + (sub ? '<div class="kpi-s">' + sub + '</div>' : '') + '</div>';
@@ -156,6 +166,7 @@ const delta = (a, b) => { if (!b) return ''; const d = (a / b - 1) * 100; return
 
 /* ---------- Início ---------- */
 const V = {};
+V.apresentacoes = () => '<div class="empty-big">' + icon('presenter') + '<h3>Apresentações</h3><p>Abrindo o editor…</p></div>';
 const onboarding = () => {
   const L = visLancs(), steps = [
     [ST.produtos.length > 0, 'Crie seus produtos', 'Cada produto guarda a sua porcentagem de comissão.', 'newProd', 'Criar produto'],
@@ -413,13 +424,15 @@ DRAWERS.cliente = (d) => {
         '<form class="ct-new" data-id="' + c.id + '"><select class="inp" name="tipo" aria-label="Tipo de contato">' + ['Reunião', 'Ligação', 'WhatsApp', 'E-mail'].map(x => '<option>' + x + '</option>').join('') + '</select><input class="inp" name="nota" placeholder="O que foi conversado?" aria-label="Resumo do contato"><button class="btn btn-sm" data-act="addContato" data-id="' + c.id + '">Registrar</button></form>' +
         '<div class="tl">' + ((c.contatos || []).slice().sort((x, y) => y.d.localeCompare(x.d)).map(k => '<div class="tl-i"><i></i><div><b>' + esc(k.tipo) + '</b> <small class="muted">' + fDate(k.d) + '</small><br><span>' + esc(k.nota || '') + '</span></div></div>').join('') || '<div class="muted" style="font-size:13px">Nenhum contato registrado.</div>') + '</div></div>' +
       '<div><p class="sec-t">Anotações</p><textarea class="inp" style="height:90px;padding:10px" data-chg="cliNota" data-id="' + c.id + '" placeholder="Objetivos, preferências, próximos passos…">' + esc(c.notas || '') + '</textarea></div>' +
-    '</div><div class="dr-f"><button class="btn btn-ghost" data-act="editCli" data-id="' + c.id + '">Editar cliente</button><button class="btn" data-act="newEv" data-cli="' + c.id + '">' + icon('calendar', 'ic-sm') + 'Agendar reunião</button><button class="btn btn-primary" data-act="newLanc" data-cli="' + c.id + '">' + icon('plus', 'ic-sm') + 'Novo lançamento</button></div>';
+    '</div><div class="dr-f"><button class="btn btn-ghost" data-act="editCli" data-id="' + c.id + '">Editar cliente</button><button class="btn" data-act="newEv" data-cli="' + c.id + '">' + icon('calendar', 'ic-sm') + 'Agendar reunião</button><button class="btn" data-act="cliDeck" data-id="' + c.id + '">' + icon('presenter', 'ic-sm') + 'Apresentação</button><button class="btn btn-primary" data-act="newLanc" data-cli="' + c.id + '">' + icon('plus', 'ic-sm') + 'Novo lançamento</button></div>';
 };
 const mini = (l, v, cls) => '<div class="mini"><small>' + l + '</small><b class="' + (cls || '') + '">' + v + '</b></div>';
 
 /* ---------- Modais ---------- */
-const openModal = (title, body, foot) => { const m = $('#modal'); m.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-label="' + esc(title) + '"><div class="modal-h"><h3>' + esc(title) + '</h3><button class="ibtn" data-act="closeModal" aria-label="Fechar">' + icon('x') + '</button></div><div class="modal-b">' + body + '</div>' + (foot ? '<div class="modal-f">' + foot + '</div>' : '') + '</div>'; m.hidden = false; const f = m.querySelector('input:not([type=hidden]),select'); if (f) setTimeout(() => f.focus(), 30); };
-const closeModal = () => { $('#modal').hidden = true; $('#modal').innerHTML = ''; };
+const openModal = W.openModal = (title, body, foot, wide) => { const m = $('#modal'); m.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-label="' + esc(title) + '"' + (wide ? ' style="width:min(1000px,100%)"' : '') + '><div class="modal-h"><h3>' + esc(title) + '</h3><button class="ibtn" data-act="closeModal" aria-label="Fechar">' + icon('x') + '</button></div><div class="modal-b">' + body + '</div>' + (foot ? '<div class="modal-f">' + foot + '</div>' : '') + '</div>'; m.hidden = false; const f = m.querySelector('input:not([type=hidden]),select'); if (f) setTimeout(() => f.focus(), 30); };
+const closeModal = W.closeModal = () => { $('#modal').hidden = true; $('#modal').innerHTML = ''; };
+W.confirmBox = (title, text, okLabel, fn) => { W._confirmFn = fn; openModal(title, '<p style="margin:0" class="muted">' + esc(text) + '</p>', '<button class="btn btn-ghost" data-act="closeModal">Cancelar</button><button class="btn btn-danger" data-act="confirmOk">' + esc(okLabel) + '</button>'); };
+W.nowHM = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 const opts = (list, cur, val, lab) => list.map(x => '<option value="' + esc(x[val]) + '"' + (x[val] === cur ? ' selected' : '') + '>' + esc(x[lab]) + '</option>').join('');
 function lancForm(l) {
   const clis = visClientes().slice().sort((a, b) => a.nome.localeCompare(b.nome));
@@ -600,7 +613,7 @@ ACT.exportCSV = () => {
 };
 
 /* ---------- Navegação e shell ---------- */
-const TABS = [['inicio', 'Início'], ['clientes', 'Clientes'], ['lancamentos', 'Lançamentos'], ['conferencia', 'Conferência'], ['agenda', 'Agenda'], ['produtos', 'Produtos'], ['projecao', 'Projeção'], ['relatorios', 'Relatórios'], ['assessores', 'Assessores']];
+const TABS = [['inicio', 'Início'], ['clientes', 'Clientes'], ['lancamentos', 'Lançamentos'], ['conferencia', 'Conferência'], ['agenda', 'Agenda'], ['apresentacoes', 'Apresentações'], ['produtos', 'Produtos'], ['projecao', 'Projeção'], ['relatorios', 'Relatórios'], ['assessores', 'Assessores']];
 const tabsVis = () => TABS.filter(([id]) => id !== 'assessores' || isAdmin());
 function renderTabs() { $('#tabs').innerHTML = tabsVis().map(([id, l]) => '<button class="tab ' + (W.UI.tab === id ? 'on' : '') + '" data-act="go" data-v="' + id + '"' + (W.UI.tab === id ? ' aria-current="page"' : '') + '>' + icon(AT[id], 'ic-sm') + l + '</button>').join(''); }
 function renderTop() {
@@ -609,21 +622,25 @@ function renderTop() {
 }
 W.render = () => { const main = $('#main'), keep = main.scrollTop; main.innerHTML = (V[W.UI.tab] || V.inicio)(); renderTabs(); main.scrollTop = keep; if (W.UI.drawer) renderDrawer(); };
 const render = W.render;
-const go = (t) => { if (!V[t]) t = 'inicio'; W.UI.tab = t; try { history.replaceState(null, '', '#' + t); } catch (e) {} $('#main').scrollTop = 0; render(); };
+const go = W.go = (t) => { if (!V[t]) t = 'inicio'; closePop(); if (W.Studio) W.Studio.toggle(t === 'apresentacoes'); W.UI.tab = t; try { history.replaceState(null, '', '#' + t); } catch (e) {} $('#main').scrollTop = 0; render(); };
 const openDrawer = (d) => { W.UI.drawer = d; renderDrawer(); $('#drawer').hidden = false; $('#scrim').hidden = false; };
 const closeDrawer = () => { W.UI.drawer = null; $('#drawer').hidden = true; $('#scrim').hidden = true; $('#drawer').innerHTML = ''; };
 function renderDrawer() { const d = W.UI.drawer; if (!d) return; const b = $('#drawer .dr-b'), sc = b ? b.scrollTop : 0; $('#drawer').innerHTML = DRAWERS[d.type](d); const nb = $('#drawer .dr-b'); if (nb) nb.scrollTop = sc; }
-const openPop = (anchor, title, items) => {
-  const p = $('#pop'); W._popFns = items.map(i => i[1]);
-  p.innerHTML = '<div class="pop-h"><span>' + esc(title) + '</span><button class="ibtn" data-act="closePop" aria-label="Fechar">' + icon('x', 'ic-sm') + '</button></div><div class="pop-b" style="padding:6px">' + items.map((c, i) => '<button class="pop-item" data-act="popItem" data-i="' + i + '">' + c[0] + '</button>').join('') + '</div>';
-  p.hidden = false; const r = anchor.getBoundingClientRect(), pw = p.offsetWidth;
-  p.style.left = clamp(r.left + r.width / 2 - pw / 2, 12, innerWidth - pw - 12) + 'px'; p.style.top = (r.bottom + 8) + 'px'; W._popAnchor = anchor;
+const openPop = W.openPop = (anchor, title, content) => {
+  const p = $('#pop'); let body;
+  if (Array.isArray(content)) { W._popFns = content.map(i => i[1]); body = '<div class="pop-b" style="padding:6px">' + content.map((c, i) => '<button class="pop-item" data-act="popItem" data-i="' + i + '">' + c[0] + '</button>').join('') + '</div>'; }
+  else body = '<div class="pop-b">' + (content || '') + '</div>';
+  p.innerHTML = '<div class="pop-h"><span>' + esc(title) + '</span><button class="ibtn" data-act="closePop" aria-label="Fechar">' + icon('x', 'ic-sm') + '</button></div>' + body;
+  p.hidden = false; const r = anchor.getBoundingClientRect(), pw = p.offsetWidth, ph = p.offsetHeight;
+  let top = r.bottom + 8; if (top + ph > innerHeight - 12) top = Math.max(12, r.top - ph - 8);
+  p.style.left = clamp(r.left + r.width / 2 - pw / 2, 12, innerWidth - pw - 12) + 'px'; p.style.top = top + 'px'; W._popAnchor = anchor;
 };
-const closePop = () => { $('#pop').hidden = true; W._popAnchor = null; };
+const closePop = W.closePop = () => { $('#pop').hidden = true; W._popAnchor = null; };
 
 Object.assign(ACT, {
   go: (b) => go(b.dataset.v), closeModal, closeDrawer, closePop,
   popItem: (b) => { const f = W._popFns && W._popFns[+b.dataset.i]; closePop(); f && f(); },
+  confirmOk: () => { const f = W._confirmFn; closeModal(); f && f(); },
   openCli: (b) => openDrawer({ type: 'cliente', id: b.dataset.id }),
   toggleHP: () => HP.toggle(),
   cliPerfil: (b) => { W.UI.cPerfil = b.dataset.v; render(); },
@@ -642,8 +659,8 @@ CH.lMes = (t, ev) => { if (ev.type !== 'change') return; W.UI.lMes = t.value; re
 CH.asSel = (t, ev) => { if (ev.type !== 'change') return; W.UI.as = t.value; render(); };
 
 document.addEventListener('click', (ev) => {
-  const b = ev.target.closest('[data-act]');
-  if (!$('#pop').hidden && !ev.target.closest('#pop') && (!b || b !== W._popAnchor)) closePop();
+  const b = ev.target.closest('[data-act]'), ab = ev.target.closest('[data-act],[data-x]');
+  if (!$('#pop').hidden && !ev.target.closest('#pop') && (!ab || ab !== W._popAnchor)) closePop();
   if (!ev.target.closest('.search')) $('#gresults').hidden = true;
   if (!b || b.disabled) return;
   const fn = ACT[b.dataset.act]; if (fn) { ev.preventDefault(); fn(b, ev); }
@@ -681,7 +698,7 @@ async function enter() {
   try {
     ST = normalize(await W.Store.load()); W.ST = ST;
     ST.assessores = W.Store.members();
-    ME = W.Store.meId() || (ST.assessores[0] || {}).id;
+    ME = W.Store.meId() || (ST.assessores[0] || {}).id; W.ME = ME;
     if (W.Store.mode === 'local' && !Object.keys(ST.receb).length && ST.lancs.length) { seedReceb(); persist(); }
     started = true;
     $('#login').hidden = true; $('#app').hidden = false; renderTop();
@@ -692,7 +709,7 @@ addEventListener('horus:remote', () => {
   if (!started) return; clearTimeout(renderT);
   renderT = setTimeout(() => {
     normalize(ST); ST.assessores = W.Store.members();
-    if (!$('#modal').hidden) return;
+    if (!$('#modal').hidden || W.UI.tab === 'apresentacoes') return;
     const ae = document.activeElement; if (ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName) && ($('#main').contains(ae) || $('#drawer').contains(ae))) return;
     render(); renderTop();
   }, 400);

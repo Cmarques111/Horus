@@ -6,8 +6,8 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWith
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { OWNER, INITIAL_MEMBERS } from './config.js';
 
-const ARR = ['clientes', 'produtos', 'lancs', 'eventos'];
-const MAPS = { receb: 'receb' };
+const ARR = ['clientes', 'produtos', 'lancs', 'eventos', 'docs', 'imgLib'];
+const MAPS = { receb: 'receb', assets: 'assets' };
 const SINGLE = ['cfg', 'nota'];
 const ASC = new Set(['lancs', 'eventos']);
 const MAX_DOC = 900000;
@@ -157,9 +157,12 @@ export function createFirebaseStore(config) {
     if (big.length) toast('Um registro ficou grande demais para salvar (' + big.map(o => o.coll).join(', ') + '). Reduza imagens coladas direto no design.', 'warn');
     const todo = ops.filter(o => !(o.t === 'set' && o.j.length > MAX_DOC));
     try {
-      for (let i = 0; i < todo.length; i += 400) {
+      const groups = []; let g = [], sz = 0;
+      todo.forEach(o => { const n = o.t === 'set' ? o.j.length : 100; if (g.length && (g.length >= 400 || sz + n > 7000000)) { groups.push(g); g = []; sz = 0; } g.push(o); sz += n; });
+      if (g.length) groups.push(g);
+      for (const grp of groups) {
         const b = writeBatch(db);
-        todo.slice(i, i + 400).forEach(o => {
+        grp.forEach(o => {
           if (o.t === 'set') b.set(doc(db, o.coll, o.id), { j: o.j, c: o.c, u: who, t: serverTimestamp() });
           else b.delete(doc(db, o.coll, o.id));
         });

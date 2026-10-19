@@ -174,7 +174,13 @@ W.readImage = (file, max) => new Promise((res, rej) => {
       c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
       const type = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-      res({ src: c.toDataURL(type, 0.86), w: c.width, h: c.height, name: file.name });
+      let src = c.toDataURL(type, 0.86);
+      /* Cada imagem precisa caber num registro do banco (limite ~900 KB) */
+      for (let q = 0.82, n = 0; src.length > 850000 && n < 8; n++) {
+        if (n >= 3) { const c2 = document.createElement('canvas'); c2.width = Math.round(c.width * 0.8); c2.height = Math.round(c.height * 0.8); const x = c2.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c2.width, c2.height); x.drawImage(c, 0, 0, c2.width, c2.height); c.width = c2.width; c.height = c2.height; c.getContext('2d').drawImage(c2, 0, 0); }
+        src = c.toDataURL('image/jpeg', q); q = Math.max(0.6, q - 0.08);
+      }
+      res({ src, w: c.width, h: c.height, name: file.name });
     };
     img.onerror = rej;
     img.src = fr.result;

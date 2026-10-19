@@ -19,6 +19,17 @@ A parte do assessor é a receita escritório × o repasse dele (padrão de 35%, 
 
 A **Conferência** compara, mês a mês e produto a produto, a receita calculada com o valor que veio no extrato do escritório.
 
+## Apresentações
+
+A aba **Apresentações** abre um editor de slides e artes com a marca HORUS (mesmo editor do Atlas):
+
+- **Gerar a partir de um cliente:** escolha o cliente e o tipo (proposta ou revisão de carteira). O HORUS monta os slides com o perfil, o patrimônio, a alocação por classe e as posições do cliente. Comissões e receitas nunca entram nas apresentações.
+- **Modelos prontos:** proposta de carteira, revisão de carteira, diagnóstico financeiro, planejamento de aposentadoria e institucional Horus, além de posts, stories, carrossel, cartão de visita e documento timbrado.
+- **Marca:** três versões (Noite, Clara e Grafite), com o símbolo que se adapta a fundos claros e escuros.
+- **Exportar:** PDF, PNG, JPG e PowerPoint. Também dá para apresentar em tela cheia ou no modo apresentador, com notas e cronômetro.
+- Campos entre colchetes, como `[valor]`, são para completar antes de apresentar. Os indicadores econômicos (Selic, IPCA, CDI, dólar) devem ser atualizados na véspera.
+- As imagens enviadas ficam no banco (até ~850 KB cada, reduzidas automaticamente).
+
 ## Implantação (uma vez só)
 
 1. **Firebase:** no projeto `horus-consultoria`:
@@ -55,6 +66,8 @@ src/main.js                escolhe Firebase (publicado) ou demonstração (sem F
 src/config.js              dono do sistema e assessores iniciais
 src/store-firebase.js      login, sincronização em tempo real e assessores
 src/app/horus.js           telas, cálculos de comissão, conferência e projeção
+src/app/horus-studio.js    aba Apresentações e gerador a partir do cliente
+src/app/studio-*.js        editor de slides (modelos, renderização, exportação)
 src/app/store-local.js     modo demonstração com dados de exemplo
 firestore.rules            regras de acesso ao banco
 .github/workflows/         publicação automática

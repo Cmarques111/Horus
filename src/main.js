@@ -3,11 +3,16 @@
    Sem Firebase (demonstração) → dados só neste navegador. */
 import './styles/crm.css';
 import './styles/horus.css';
+import './styles/studio.css';
 
 import './app/core.js';
 import './app/hp12c.js';
 import './app/store-local.js';
 import './app/gcal.js';
+import './app/horus-logo.js';
+import './app/studio-core.js';
+import './app/studio-editor.js';
+import './app/horus-studio.js';
 import './app/horus.js';
 
 async function firebaseConfig() {

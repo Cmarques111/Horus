@@ -25,8 +25,8 @@ service cloud.firestore {
     match /meta/state { allow read, write: if isMember(); }
 
     match /{coll}/{id} {
-      allow read, delete: if isMember() && coll in ['clientes', 'produtos', 'lancs', 'receb', 'eventos'];
-      allow create, update: if isMember() && smallDoc() && coll in ['clientes', 'produtos', 'lancs', 'receb', 'eventos'];
+      allow read, delete: if isMember() && coll in ['clientes', 'produtos', 'lancs', 'receb', 'eventos', 'docs', 'imgLib', 'assets'];
+      allow create, update: if isMember() && smallDoc() && coll in ['clientes', 'produtos', 'lancs', 'receb', 'eventos', 'docs', 'imgLib', 'assets'];
     }
   }
 }
