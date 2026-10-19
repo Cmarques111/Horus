@@ -7,6 +7,7 @@ import './styles/horus.css';
 import './app/core.js';
 import './app/hp12c.js';
 import './app/store-local.js';
+import './app/gcal.js';
 import './app/horus.js';
 
 async function firebaseConfig() {

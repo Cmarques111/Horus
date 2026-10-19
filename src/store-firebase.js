@@ -6,10 +6,10 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWith
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { OWNER, INITIAL_MEMBERS } from './config.js';
 
-const ARR = ['clientes', 'produtos', 'lancs'];
+const ARR = ['clientes', 'produtos', 'lancs', 'eventos'];
 const MAPS = { receb: 'receb' };
 const SINGLE = ['cfg', 'nota'];
-const ASC = new Set(['lancs']);
+const ASC = new Set(['lancs', 'eventos']);
 const MAX_DOC = 900000;
 const sid = () => 'm' + Math.random().toString(36).slice(2, 8);
 const initials = (n) => String(n || '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';

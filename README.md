@@ -40,6 +40,13 @@ A **Conferência** compara, mês a mês e produto a produto, a receita calculada
 4. **Publicar:** em **Actions › Publicar no Firebase › Run workflow**.
 5. **Primeiro acesso:** Carlos (caduliam325@gmail.com) entra em **Primeiro acesso**, confirma o e-mail e faz login. Isso libera automaticamente o Kauê (kaueom690@gmail.com), que faz o mesmo caminho em seguida.
 
+## Google Agenda (opcional)
+
+1. Ative a **Google Calendar API**: <https://console.cloud.google.com/apis/library/calendar-json.googleapis.com?project=horus-consultoria>.
+2. Em **APIs e serviços › Tela de consentimento OAuth** (Google Auth Platform), crie o app "HORUS", tipo **Externo**, e adicione os e-mails dos assessores como **usuários de teste**.
+3. Em **Credenciais › Criar credenciais › ID do cliente OAuth › Aplicativo da Web**, adicione as origens `https://horus-consultoria.web.app` e `https://horus-consultoria.firebaseapp.com`.
+4. No HORUS, abra **Agenda › Ligar Google Agenda** e cole o ID do cliente. Depois, cada assessor clica em **Conectar meu Google Agenda**.
+
 ## Estrutura
 
 ```

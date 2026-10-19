@@ -1,9 +1,30 @@
 {
   "indexes": [],
   "fieldOverrides": [
-    { "collectionGroup": "clientes", "fieldPath": "j", "indexes": [] },
-    { "collectionGroup": "produtos", "fieldPath": "j", "indexes": [] },
-    { "collectionGroup": "lancs", "fieldPath": "j", "indexes": [] },
-    { "collectionGroup": "receb", "fieldPath": "j", "indexes": [] }
+    {
+      "collectionGroup": "clientes",
+      "fieldPath": "j",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "produtos",
+      "fieldPath": "j",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "lancs",
+      "fieldPath": "j",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "receb",
+      "fieldPath": "j",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "eventos",
+      "fieldPath": "j",
+      "indexes": []
+    }
   ]
 }

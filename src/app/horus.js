@@ -59,11 +59,12 @@ function seed() {
       lancs.push({ id: uid('l'), cli: c.id, prod: pid, ass: c.ass, data: d, valor: val, taxa: pr.taxa, venc, fim: '', obs: '' });
     }
   });
-  return { v: 2, assessores: ASSESSORES, produtos: PRODUTOS, clientes, lancs, receb: null, cfg: {}, nota: '' };
+  const eventos = [[0, 9.5, 'Revisão de carteira', 'c1'], [1, 14, 'Apresentação de previdência', 'c3'], [2, 11, 'Reunião de equipe', ''], [3, 16, 'Proposta de consórcio', 'c6'], [7, 10, 'Comitê de investimentos', '']].map(([o, h, t, cli], i) => ({ id: uid('e'), d: dOff(o), h, dur: 1, t, cli, local: i === 2 ? 'Escritório' : 'Google Meet', ass: i % 2 ? 'a2' : 'a1' }));
+  return { v: 2, assessores: ASSESSORES, produtos: PRODUTOS, clientes, lancs, eventos, receb: null, cfg: {}, nota: '' };
 }
 W.horusSeed = seed;
 let ST = null;
-const normalize = (st) => { st = st || {}; ['clientes', 'produtos', 'lancs'].forEach(k => { if (!Array.isArray(st[k])) st[k] = []; }); if (!st.receb || typeof st.receb !== 'object') st.receb = {}; if (!st.cfg) st.cfg = {}; st.clientes.forEach(c => { if (!c.contatos) c.contatos = []; }); return st; };
+const normalize = (st) => { st = st || {}; ['clientes', 'produtos', 'lancs', 'eventos'].forEach(k => { if (!Array.isArray(st[k])) st[k] = []; }); if (!st.receb || typeof st.receb !== 'object') st.receb = {}; if (!st.cfg) st.cfg = {}; st.clientes.forEach(c => { if (!c.contatos) c.contatos = []; }); return st; };
 const persist = () => { if (W.Store && ST) W.Store.save(ST); };
 W.setSync = (txt, kind) => { const si = $('#syncInfo'); if (si) si.innerHTML = '<span class="live-dot"' + (kind === 'off' ? ' style="background:var(--muted);box-shadow:none"' : kind === 'warn' ? ' style="background:var(--warn);box-shadow:none"' : '') + '></span>' + esc(txt); };
 W.UI = { tab: 'inicio', as: 'todos', cMes: ymAddG(iso(TODAY).slice(0, 7), -1), pj: null, q: '', lMes: iso(TODAY).slice(0, 7), lCat: 'Todas', rPer: '12m', cPerfil: 'Todos', drawer: null };
@@ -128,7 +129,7 @@ const tipoTag = (t) => '<span class="tag ' + (t === 'recorrente' ? 't-fin' : 't-
 const avA = (id) => '<span class="av" title="' + esc(assOf(id).nome) + '">' + esc(assOf(id).ini) + '</span>';
 
 /* ---------- Componentes ---------- */
-const AT = { inicio: 'home', clientes: 'user', lancamentos: 'money', conferencia: 'check', produtos: 'coins', projecao: 'trend', relatorios: 'chart', assessores: 'star' };
+const AT = { inicio: 'home', clientes: 'user', lancamentos: 'money', conferencia: 'check', agenda: 'calendar', produtos: 'coins', projecao: 'trend', relatorios: 'chart', assessores: 'star' };
 const ph = (tab, eyebrow, title, meta, actions) => '<div class="ph"><div class="ph-l"><div class="ph-ico">' + icon(AT[tab]) + '</div><div><div class="eyebrow">' + esc(eyebrow) + '</div><h1>' + esc(title) + '</h1>' + (meta ? '<div class="ph-meta">' + meta + '</div>' : '') + '</div></div><div class="ph-r">' + (actions || '') + '</div></div>';
 const cardW = (title, sub, body, opts) => { opts = opts || {}; return '<section class="card"><div class="card-h"><div><h3>' + title + '</h3>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>' + (opts.tools || '') + '</div><div class="card-b"' + (opts.flush ? ' style="padding:0"' : '') + '>' + body + '</div></section>'; };
 const kpi = (cls, label, value, sub, extra) => '<div class="card kpi hkp ' + (cls || '') + '"><div class="kpi-l"><span>' + label + '</span></div><div class="kpi-v">' + value + '</div>' + (extra || '') + (sub ? '<div class="kpi-s">' + sub + '</div>' : '') + '</div>';
@@ -331,6 +332,70 @@ V.projecao = () => {
 CH.pj = (t, ev) => { W.UI.pj[t.dataset.k] = +t.value; if (ev.type === 'change') render(); else { const v = $('#pjv-' + t.dataset.k); if (v) v.textContent = t.dataset.k === 'tx' ? fNum(+t.value, 2) + '%' : t.dataset.k === 'cresc' ? fNum(+t.value, 1) + '%' : fBRL(+t.value); } };
 ACT.pjHz = (b) => { W.UI.pj.hz = +b.dataset.v; render(); };
 
+/* ---------- Agenda ---------- */
+const DIAS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+const weekStart = (off) => { const d = new Date(TODAY); const wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd + (off || 0) * 7); return d; };
+const hm = (h) => String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.round((h % 1) * 60)).padStart(2, '0');
+let gBusy = false;
+function agItems(from, to) {
+  const a = scopeAss(), out = [];
+  ST.eventos.filter(e => e.d >= from && e.d <= to && (!a || e.ass === a)).forEach(e => out.push({ k: 'ev', id: e.id, d: e.d, h: e.h, dur: e.dur, t: e.t, sub: e.cli ? cliOf(e.cli).nome : (e.local || ''), cli: e.cli }));
+  visClientes().filter(c => c.prox && c.prox >= from && c.prox <= to).forEach(c => out.push({ k: 'ct', id: c.id, d: c.prox, h: null, t: 'Contato: ' + c.nome, sub: c.perfil, cli: c.id }));
+  visLancs().filter(l => l.venc && l.venc >= from && l.venc <= to).forEach(l => out.push({ k: 'vc', id: l.id, d: l.venc, h: null, t: 'Vence: ' + prodOf(l.prod).nome, sub: cliOf(l.cli).nome + ' · ' + fBRL(l.valor), cli: l.cli }));
+  if (W.GCal && W.GCal.connected()) (W.GCal.cached(from, to) || []).forEach(g => out.push({ k: 'g', id: g.id, d: g.d, h: g.h, dur: g.dur, t: g.t, sub: 'Google Agenda', link: g.link }));
+  return out.sort((x, y) => x.d.localeCompare(y.d) || (x.h == null ? -1 : x.h) - (y.h == null ? -1 : y.h));
+}
+V.agenda = () => {
+  const off = W.UI.agWeek || 0, ws = weekStart(off), days = Array.from({ length: 7 }, (_, i) => { const d = new Date(ws); d.setDate(ws.getDate() + i); return iso(d); });
+  const from = days[0], to = days[6], items = agItems(from, to), gc = W.GCal && W.GCal.connected(), cid = ST.cfg.gcalClientId;
+  if (gc && !W.GCal.cached(from, to) && !gBusy) { gBusy = true; W.GCal.events(from, to).then(() => { gBusy = false; render(); }).catch(er => { gBusy = false; toast('Google Agenda: ' + er.message, 'warn'); }); }
+  const label = new Date(from + 'T12:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) + ' a ' + new Date(to + 'T12:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+  const gBtn = W.Store.mode === 'local' ? '' : !cid ? '<button class="btn" data-act="gSetup">' + icon('calendar', 'ic-sm') + 'Ligar Google Agenda</button>' : gc ? '<button class="btn" data-act="gSync">' + icon('refresh', 'ic-sm') + 'Google conectado · atualizar</button>' : '<button class="btn" data-act="gConnect">' + icon('calendar', 'ic-sm') + 'Conectar meu Google Agenda</button>';
+  const chip = (it) => '<button class="ag-it ag-' + it.k + '" data-act="agOpen" data-k="' + it.k + '" data-id="' + esc(it.id) + '"' + (it.cli ? ' data-cli="' + it.cli + '"' : '') + '><b>' + (it.h == null ? '' : '<time>' + hm(it.h) + '</time>') + esc(it.t) + '</b>' + (it.sub ? '<small>' + esc(it.sub) + '</small>' : '') + '</button>';
+  const today = iso(TODAY);
+  return ph('agenda', 'Compromissos e lembretes', 'Agenda', 'Reuniões, contatos com clientes e vencimentos' + (gc ? ', junto com o seu Google Agenda' : ''), gBtn + '<button class="btn btn-primary" data-act="newEv">' + icon('plus', 'ic-sm') + 'Novo compromisso</button>') +
+    '<div class="ag-bar"><div class="row"><button class="btn btn-sm" data-act="agWk" data-v="-1" aria-label="Semana anterior">←</button><button class="btn btn-sm" data-act="agWk" data-v="0">Hoje</button><button class="btn btn-sm" data-act="agWk" data-v="1" aria-label="Próxima semana">→</button><b>' + label + '</b></div>' +
+      '<div class="ag-leg"><span class="ag-ev">Compromisso</span><span class="ag-ct">Contato com cliente</span><span class="ag-vc">Vencimento</span>' + (gc ? '<span class="ag-g">Google Agenda</span>' : '') + '</div></div>' +
+    (W.Store.mode === 'local' ? '' : !cid ? '<div class="banner" style="margin-bottom:14px">' + icon('calendar') + '<div style="flex:1"><b>Traga seu Google Agenda para cá.</b> Depois de uma configuração única, cada assessor conecta a própria conta e vê as reuniões do Google junto com os compromissos do HORUS. Os compromissos criados aqui também podem ir para o Google.</div><button class="btn btn-sm" data-act="gSetup">Configurar</button></div>' : '') +
+    '<div class="wk">' + days.map((d, i) => { const its = items.filter(x => x.d === d); return '<section class="wk-d' + (d === today ? ' today' : '') + (i > 4 ? ' wkend' : '') + '"><header><small>' + DIAS[i] + '</small><b>' + d.slice(8) + '</b><button class="ibtn" data-act="newEv" data-d="' + d + '" aria-label="Novo compromisso em ' + fDate(d) + '">' + icon('plus', 'ic-sm') + '</button></header><div class="wk-l">' + (its.map(chip).join('') || '<span class="wk-e">Livre</span>') + '</div></section>'; }).join('') + '</div>';
+};
+ACT.agWk = (b) => { const v = +b.dataset.v; W.UI.agWeek = v === 0 ? 0 : (W.UI.agWeek || 0) + v; render(); };
+ACT.agOpen = (b) => {
+  const k = b.dataset.k;
+  if (k === 'ev') return evOpen(ST.eventos.find(e => e.id === b.dataset.id));
+  if (k === 'g') { const g = W.GCal.find(b.dataset.id); if (g && g.link) window.open(g.link, '_blank', 'noopener'); return; }
+  if (b.dataset.cli) openDrawer({ type: 'cliente', id: b.dataset.cli });
+};
+function evForm(e) {
+  const clis = visClientes().slice().sort((a, b) => a.nome.localeCompare(b.nome)), gc = W.GCal && W.GCal.connected();
+  return '<form id="evForm" class="grid-f"><label class="fld req" style="grid-column:1/-1"><span>Compromisso</span><input name="t" value="' + esc(e.t || '') + '" placeholder="Ex.: Revisão de carteira"></label>' +
+    '<label class="fld"><span>Data</span><input type="date" name="d" value="' + (e.d || iso(TODAY)) + '"></label><label class="fld"><span>Horário</span><input type="time" name="h" value="' + hm(e.h == null ? 10 : e.h) + '"></label>' +
+    '<label class="fld"><span>Duração</span><select name="dur">' + [[0.5, '30 min'], [1, '1 hora'], [1.5, '1h30'], [2, '2 horas']].map(([v, l]) => '<option value="' + v + '"' + ((e.dur || 1) == v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
+    '<label class="fld"><span>Cliente (opcional)</span><select name="cli"><option value="">Nenhum</option>' + opts(clis, e.cli || '', 'id', 'nome') + '</select></label>' +
+    '<label class="fld" style="grid-column:1/-1"><span>Local ou link</span><input name="local" value="' + esc(e.local || '') + '" placeholder="Escritório, Meet, endereço…"></label>' +
+    (!e.id && gc ? '<label class="pw-tog" style="grid-column:1/-1"><input type="checkbox" name="g" checked> Também criar no meu Google Agenda</label>' : '') +
+    (!e.id && !gc && W.Store.mode !== 'local' ? '<p class="muted" style="grid-column:1/-1;margin:0;font-size:12.5px">Conecte o Google Agenda na tela Agenda para criar o compromisso lá também.</p>' : '') + '</form>';
+}
+function evOpen(e) {
+  e = e || {};
+  openModal(e.id ? 'Editar compromisso' : 'Novo compromisso', evForm(e), (e.id ? '<button class="btn btn-danger" data-act="evDel" data-id="' + e.id + '" style="margin-right:auto">Excluir</button>' : '') + '<button class="btn btn-ghost" data-act="closeModal">Cancelar</button><button class="btn btn-primary" data-act="evSave"' + (e.id ? ' data-id="' + e.id + '"' : '') + '>Salvar</button>');
+}
+ACT.newEv = (b) => evOpen({ d: (b && b.dataset.d) || iso(TODAY), cli: (b && b.dataset.cli) || '' });
+ACT.evSave = async (b) => {
+  const f = $('#evForm'), t = f.t.value.trim(); if (!t) { toast('Dê um nome ao compromisso.', 'warn'); return; }
+  const [hh, mm] = (f.h.value || '10:00').split(':').map(Number);
+  const data = { t, d: f.d.value || iso(TODAY), h: hh + mm / 60, dur: +f.dur.value, cli: f.cli.value, local: f.local.value.trim() };
+  if (b.dataset.id) Object.assign(ST.eventos.find(e => e.id === b.dataset.id), data); else ST.eventos.push(Object.assign({ id: uid('e'), ass: ME }, data));
+  persist(); closeModal(); render(); toast('Compromisso salvo');
+  if (!b.dataset.id && f.g && f.g.checked) { try { await W.GCal.create(data); toast('Compromisso salvo e criado no Google Agenda'); } catch (er) { toast('Salvo no HORUS, mas não foi para o Google: ' + er.message, 'warn'); } }
+};
+ACT.evDel = (b) => { ST.eventos = ST.eventos.filter(e => e.id !== b.dataset.id); persist(); closeModal(); render(); toast('Compromisso excluído'); };
+ACT.gConnect = async () => { try { await W.GCal.connect(); toast('Google Agenda conectado'); render(); } catch (er) { toast('Não foi possível conectar: ' + er.message, 'warn'); } };
+ACT.gSync = () => { W.GCal.clear(); render(); toast('Atualizando o Google Agenda…'); };
+ACT.gSetup = () => openModal('Ligar o Google Agenda', '<p style="margin:0 0 12px">Cole aqui o <b>ID do cliente OAuth</b> criado uma única vez no Google Cloud (o Claude te guia nessa criação). Depois disso, você e o Kauê só clicam em <b>Conectar meu Google Agenda</b>.</p><label class="fld"><span>ID do cliente OAuth</span><input id="gCid" value="' + esc(ST.cfg.gcalClientId || '') + '" placeholder="000000000000-xxxx.apps.googleusercontent.com"></label>',
+  '<button class="btn btn-ghost" data-act="closeModal">Cancelar</button><button class="btn btn-primary" data-act="gSetupSave">Salvar</button>');
+ACT.gSetupSave = () => { const v = $('#gCid').value.trim(); if (v && !/\.apps\.googleusercontent\.com$/.test(v)) { toast('Esse ID deve terminar em .apps.googleusercontent.com', 'warn'); return; } ST.cfg.gcalClientId = v; persist(); closeModal(); render(); toast(v ? 'Google Agenda configurado. Agora clique em Conectar.' : 'Configuração removida'); };
+
 const DRAWERS = {};
 DRAWERS.cliente = (d) => {
   const c = cliOf(d.id), L = ST.lancs.filter(l => l.cli === c.id).sort((a, b) => b.data.localeCompare(a.data));
@@ -348,7 +413,7 @@ DRAWERS.cliente = (d) => {
         '<form class="ct-new" data-id="' + c.id + '"><select class="inp" name="tipo" aria-label="Tipo de contato">' + ['Reunião', 'Ligação', 'WhatsApp', 'E-mail'].map(x => '<option>' + x + '</option>').join('') + '</select><input class="inp" name="nota" placeholder="O que foi conversado?" aria-label="Resumo do contato"><button class="btn btn-sm" data-act="addContato" data-id="' + c.id + '">Registrar</button></form>' +
         '<div class="tl">' + ((c.contatos || []).slice().sort((x, y) => y.d.localeCompare(x.d)).map(k => '<div class="tl-i"><i></i><div><b>' + esc(k.tipo) + '</b> <small class="muted">' + fDate(k.d) + '</small><br><span>' + esc(k.nota || '') + '</span></div></div>').join('') || '<div class="muted" style="font-size:13px">Nenhum contato registrado.</div>') + '</div></div>' +
       '<div><p class="sec-t">Anotações</p><textarea class="inp" style="height:90px;padding:10px" data-chg="cliNota" data-id="' + c.id + '" placeholder="Objetivos, preferências, próximos passos…">' + esc(c.notas || '') + '</textarea></div>' +
-    '</div><div class="dr-f"><button class="btn btn-ghost" data-act="editCli" data-id="' + c.id + '">Editar cliente</button><button class="btn btn-primary" data-act="newLanc" data-cli="' + c.id + '">' + icon('plus', 'ic-sm') + 'Novo lançamento</button></div>';
+    '</div><div class="dr-f"><button class="btn btn-ghost" data-act="editCli" data-id="' + c.id + '">Editar cliente</button><button class="btn" data-act="newEv" data-cli="' + c.id + '">' + icon('calendar', 'ic-sm') + 'Agendar reunião</button><button class="btn btn-primary" data-act="newLanc" data-cli="' + c.id + '">' + icon('plus', 'ic-sm') + 'Novo lançamento</button></div>';
 };
 const mini = (l, v, cls) => '<div class="mini"><small>' + l + '</small><b class="' + (cls || '') + '">' + v + '</b></div>';
 
@@ -535,7 +600,7 @@ ACT.exportCSV = () => {
 };
 
 /* ---------- Navegação e shell ---------- */
-const TABS = [['inicio', 'Início'], ['clientes', 'Clientes'], ['lancamentos', 'Lançamentos'], ['conferencia', 'Conferência'], ['produtos', 'Produtos'], ['projecao', 'Projeção'], ['relatorios', 'Relatórios'], ['assessores', 'Assessores']];
+const TABS = [['inicio', 'Início'], ['clientes', 'Clientes'], ['lancamentos', 'Lançamentos'], ['conferencia', 'Conferência'], ['agenda', 'Agenda'], ['produtos', 'Produtos'], ['projecao', 'Projeção'], ['relatorios', 'Relatórios'], ['assessores', 'Assessores']];
 const tabsVis = () => TABS.filter(([id]) => id !== 'assessores' || isAdmin());
 function renderTabs() { $('#tabs').innerHTML = tabsVis().map(([id, l]) => '<button class="tab ' + (W.UI.tab === id ? 'on' : '') + '" data-act="go" data-v="' + id + '"' + (W.UI.tab === id ? ' aria-current="page"' : '') + '>' + icon(AT[id], 'ic-sm') + l + '</button>').join(''); }
 function renderTop() {
