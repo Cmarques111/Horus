@@ -1,0 +1,29 @@
+name: Publicar no Firebase
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency: { group: deploy, cancel-in-progress: false }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Instalar e montar o site
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Credenciais
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/sa.json"
+      - name: Publicar
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        run: |
+          set -o pipefail
+          npx --yes firebase-tools@14 deploy --only hosting,firestore --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive --force 2>&1 | tee deploy.log || {
+            MSG=$(sed 's/\x1b\[[0-9;]*m//g' deploy.log | grep -v "ensuring required API\|is enabled" | tail -40 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Falha ao publicar::$MSG"
+            exit 1
+          }
